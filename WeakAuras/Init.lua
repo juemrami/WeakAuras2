@@ -133,25 +133,86 @@ local GetAddOnMetadata = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetad
 --- | "UNITFRAME"
 --- | "CUSTOM"
 
+--- @alias debuffClasses "curse" | "disease" | "enrage" | "magic" | "poison" | "none"
+--- @alias raidRoles "MAINTANK" | "MAINASSIST" | "TANK" | "HEALER" | "DAMAGER" | "NONE"
+
 --- @class triggerData
---- @field buffShowOn string
---- @field debuffType string
+--- @field unit string?
+--- @field debuffType "BOTH"|filter  more aptly name "auraType"
+--- @field use_debuffClass? boolean
+--- @field debuffClass? table<debuffClasses, boolean>
+--- @field useName? boolean
+--- @field auranames? string[]
+--- @field useExactSpellId? boolean
+--- @field auraspellids? string[] ids still strings at this point
+--- @field useIgnoreName? boolean
+--- @field ignoreAuraNames? string[]
+--- @field useIgnoreExactSpellId? boolean
+--- @field ignoreAuraSpellids? string[]
+--- @field useNamePattern? boolean
+--- @field namePattern_operator? string
+--- @field namePattern_name? string
+--- @field useStacks? boolean
+--- @field stacksOperator? string
+--- @field stacks? string
+--- @field useRem? boolean
+--- @field remOperator? string
+--- @field rem? string
+--- @field useTotal? boolean
+--- @field totalOperator? string
+--- @field total? string
+--- @field use_stealable? boolean
+--- @field use_isBossDebuff? boolean
+--- @field use_castByPlayer? boolean
+--- @field ownOnly? boolean
+--- @field fetchTooltip? boolean
+--- @field use_tooltip? boolean
+--- @field tooltip_operator? string
+--- @field tooltip? string
+--- @field use_tooltipValue? boolean
+--- @field tooltipValueNumber? number
+--- @field tooltipValue_operator? string
+--- @field tooltipValue? string
+--- @field useAffected? boolean
+--- @field fetchRaidMark? boolean
+--- @field useRaidRole? boolean
+--- @field raid_role? table<raidRoles, boolean>
+--- @field useClass? boolean
+--- @field class? table<ClassFile?, boolean>
+--- @field useUnitName? boolean
+--- @field unitName? string
+--- @field ignoreSelf? boolean
+--- @field ignoreDead? boolean
+--- @field ignoreDisconnected? boolean
+--- @field ignoreInvisible? boolean
 --- @field essence number?
 --- @field event string|nil
 --- @field instance_size table|nil
 --- @field itemName string?
 --- @field itemSetName string?
---- @field itemTypeName table|ni
---- @field range number?l
+--- @field itemTypeName table|nil
+--- @field range number?
 --- @field realSpellName string?
 --- @field rune number?
 --- @field spellName string?
 --- @field subeventPrefix string?
 --- @field subeventSuffix string?
 --- @field type triggerTypes
---- @field unit string?
 --- @field use_showOn boolean|nil
 --- @field use_alwaystrue boolean|nil
+--- @field useGroup_count? boolean
+--- @field useMatchPerUnit_count? boolean
+--- @field useMatch_count? boolean
+--- @field buffShowOn string
+--- @field combinePerUnit? boolean
+--- @field perUnitMode? string
+--- @field showClones? boolean
+--- @field group_count string?
+--- @field group_countOperator string?
+--- @field match_count string?
+--- @field match_countOperator string?
+--- @field matchesShowOn string?
+
 
 ---@class prototypeDataArgs
 ---@field name string

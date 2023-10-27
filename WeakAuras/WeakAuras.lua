@@ -27,7 +27,7 @@ local WeakAuras = WeakAuras
 local L = WeakAuras.L
 local versionString = WeakAuras.versionString
 local prettyPrint = WeakAuras.prettyPrint
-
+--- @class WeakAurasTimer : AceTimer
 WeakAurasTimers = setmetatable({}, {__tostring=function() return "WeakAuras" end})
 LibStub("AceTimer-3.0"):Embed(WeakAurasTimers)
 

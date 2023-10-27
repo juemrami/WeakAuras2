@@ -1,6 +1,9 @@
 if not WeakAuras.IsLibsOK() then return end
---- @type string, Private
-local AddonName, Private = ...
+local
+  --- @type string
+  AddonName,
+  --- @class Private
+  Private = ...
 
 local WeakAuras = WeakAuras;
 local L = WeakAuras.L;
