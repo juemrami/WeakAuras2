@@ -59,6 +59,9 @@ local GetAddOnMetadata = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetad
 --- @field frames table<string, table>
 --- @field function_strings table<string, string>
 --- @field GetDataByUID fun(uid: uid): auraData
+--- @field GetDiscoveredCurencies fun(): table<number|string, string>
+--- @field GetDiscoveredCurenciesSorted fun(): table<number|string, number>
+--- @field GetDiscoveredCurenciesHeaders fun(): table<string, boolean>
 --- @field GetErrorHandlerId fun(id: auraId, context: string): function
 --- @field GetErrorHandlerUid fun(uid: uid, context: string): function
 --- @field GetRegionByUID fun(uid: uid, cloneId: string): Region
@@ -384,11 +387,6 @@ local GetAddOnMetadata = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetad
 --- @field SerializeEx fun(self: LibSerialize,options: table, input: any)
 --- @field Deserialize fun(self: LibSerialize, input: string): table
 
---- @class LibClassicDurations
---- @field RegisterFrame fun(self: LibClassicDurations, frame: string)
---- @field Register fun(self: LibClassicDurations, frame: string)
---- @field GetAuraDurationByUnit fun(self: LibClassicDurations, unit: string, spellId: number, source: string?, name: string?)
-
 --- @class LibDeflate
 --- @field CompressDeflate fun(self: LibDeflate, input: string, options: table): string
 --- @field EncodeForPrint fun(self: LibDeflate, input: string): string)
@@ -500,11 +498,6 @@ do
     "LibSerialize",
     "LibUIDropDownMenu-4.0"
   }
-  if WeakAuras.IsClassicEra() then
-    tinsert(LibStubLibs, "LibClassicSpellActionCount-1.0")
-    tinsert(LibStubLibs, "LibClassicCasterino")
-    tinsert(LibStubLibs, "LibClassicDurations")
-  end
   if WeakAuras.IsRetail() then
     tinsert(LibStubLibs, "LibSpecialization")
     AddonCompartmentFrame:RegisterAddon({

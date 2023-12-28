@@ -61,13 +61,6 @@ local tinsert, wipe = table.insert, wipe
 local pairs, next, type = pairs, next, type
 local UnitAura = UnitAura
 
-local LCD
-if WeakAuras.IsClassicEra() then
-  LCD = LibStub("LibClassicDurations")
-  LCD:Register("WeakAuras")
-  UnitAura = LCD.UnitAuraWithBuffs
-end
-
 local newAPI = WeakAuras.IsRetail()
 
 local WeakAuras = WeakAuras
@@ -230,6 +223,13 @@ local function UnitIsVisibleFixed(unit)
   end
   return unitVisible[unit]
 end
+
+local function UnitInRangeFixed(unit)
+  local inRange, checked = UnitInRange(unit)
+  return inRange or not checked
+end
+
+Private.ExecEnv.UnitInRangeFixed = UnitInRangeFixed
 
 local function UnitInSubgroupOrPlayer(unit, includePets)
   if includePets == nil then
@@ -804,7 +804,7 @@ local roleIcons = {
 --- @param bestMatch MatchedAuraData
 --- @param cloneId string
 --- @param triggerStates {[string] : TriggerState}
-local function UpdateStateWithMatch(time, bestMatch, triggerStates, cloneId, matchCount, unitCount, maxUnitCount, matchCountPerUnit, totalStacks, affected, unaffected, role, raidMark)
+local function UpdateStateWithMatch(time, bestMatch, triggerStates, cloneId, matchCount, unitCount, maxUnitCount, matchCountPerUnit, totalStacks, affected, affectedUnits, unaffected, unaffectedUnits, role, raidMark)
   local debuffClassIcon = WeakAuras.EJIcons[bestMatch.debuffClass]
   if not triggerStates[cloneId] then
     local state = {
@@ -842,7 +842,9 @@ local function UpdateStateWithMatch(time, bestMatch, triggerStates, cloneId, mat
       tooltip4 = bestMatch.tooltip4,
       points = bestMatch.points,
       affected = affected,
+      affectedUnits = affectedUnits,
       unaffected = unaffected,
+      unaffectedUnits = unaffectedUnits,
       totalStacks = totalStacks,
       initialTime = time,
       refreshTime = time,
@@ -1031,11 +1033,13 @@ local function UpdateStateWithMatch(time, bestMatch, triggerStates, cloneId, mat
 
     if state.affected ~= affected then
       state.affected = affected
+      state.affectedUnits = affectedUnits
       changed = true
     end
 
     if state.unaffected ~= unaffected then
       state.unaffected = unaffected
+      state.unaffectedUnits = unaffectedUnits
       changed = true
     end
 
@@ -1057,7 +1061,6 @@ local function UpdateStateWithMatch(time, bestMatch, triggerStates, cloneId, mat
 end
 
 local function UpdateStateWithNoMatch(time, triggerStates, triggerInfo, cloneId, unit, matchCount, unitCount, maxUnitCount, matchCountPerUnit, totalStacks, affected, unaffected, role, raidMark)
-  dbg(WeakAuras.GetData(triggerInfo.id))
   local fallbackName, fallbackIcon = BuffTrigger.GetNameAndIconSimple(WeakAuras.GetData(triggerInfo.id), triggerInfo.triggernum)
   if not triggerStates[cloneId] then
     triggerStates[cloneId] = {
@@ -1074,7 +1077,9 @@ local function UpdateStateWithNoMatch(time, triggerStates, triggerInfo, cloneId,
       active = false,
       time = time,
       affected = affected,
+      affectedUnits = affectedUnits,
       unaffected = unaffected,
+      unaffectedUnits = unaffectedUnits,
       unit = unit,
       role = role,
       raidMark = raidMark,
@@ -1231,11 +1236,13 @@ local function UpdateStateWithNoMatch(time, triggerStates, triggerInfo, cloneId,
 
     if state.affected ~= affected then
       state.affected = affected
+      state.affectedUnits = affectedUnits
       changed = true
     end
 
     if state.unaffected ~= unaffected then
       state.unaffected = unaffected
+      state.unaffectedUnits = unaffectedUnits
       changed = true
     end
 
@@ -1708,6 +1715,8 @@ local function MaxUnitCount(triggerInfo)
   end
 end
 
+
+
 local function TriggerInfoApplies(triggerInfo, unit)
   local controllingUnit = unit
   if WeakAuras.UnitIsPet(unit) then
@@ -1792,7 +1801,7 @@ local function TriggerInfoApplies(triggerInfo, unit)
     return false
   end
 
-  if triggerInfo.npcId and select(6, strsplit('-', UnitGUID(unit) or '')) ~= triggerInfo.npcId then
+  if triggerInfo.npcId and not triggerInfo.npcId:Check(select(6, strsplit('-', UnitGUID(unit) or ''))) then
     return false
   end
 
@@ -1800,7 +1809,7 @@ local function TriggerInfoApplies(triggerInfo, unit)
     return false
   end
 
-  if triggerInfo.inRange and not UnitInRange(unit) then
+  if triggerInfo.inRange and not UnitInRangeFixed(unit) then
     return false
   end
 
@@ -1810,19 +1819,22 @@ end
 local function FormatAffectedUnaffected(triggerInfo, matchedUnits)
   local affected = ""
   local unaffected = ""
+  local affectedUnits, unaffectedUnits = {}, {}
   for unit in GetAllUnits(triggerInfo.unit, nil, triggerInfo.includePets) do
     if activeGroupScanFuncs[unit] and activeGroupScanFuncs[unit][triggerInfo] then
       if matchedUnits[unit] then
         affected = affected .. (GetUnitName(unit, false) or unit) .. ", "
+        tinsert(affectedUnits, unit)
       else
         unaffected = unaffected .. (GetUnitName(unit, false) or unit) .. ", "
+        tinsert(unaffectedUnits, unit)
       end
     end
   end
   unaffected = unaffected == "" and L["None"] or unaffected:sub(1, -3)
   affected = affected == "" and L["None"] or affected:sub(1, -3)
 
-  return affected, unaffected
+  return affected, affectedUnits, unaffected, unaffectedUnits
 end
 
 local recheckTriggerInfo
@@ -1918,9 +1930,9 @@ local function UpdateTriggerState(time, id, triggernum)
     end
 
     if useMatch then
-      local affected, unaffected
+      local affected, unaffected, affectedUnits, unaffectedUnits
       if triggerInfo.useAffected then
-        affected, unaffected = FormatAffectedUnaffected(triggerInfo, matchedUnits)
+        affected, affectedUnits, unaffected, unaffectedUnits = FormatAffectedUnaffected(triggerInfo, matchedUnits)
       end
 
       local unit = bestUnit(triggerInfo, bestMatch)
@@ -1928,9 +1940,9 @@ local function UpdateTriggerState(time, id, triggernum)
       local mark = markForTriggerInfo(triggerInfo, unit)
 
       if bestMatch then
-        updated = UpdateStateWithMatch(time, bestMatch, triggerStates, cloneId, matchCount, unitCount, maxUnitCount, matchCount, totalStacks, affected, unaffected, role, mark)
+        updated = UpdateStateWithMatch(time, bestMatch, triggerStates, cloneId, matchCount, unitCount, maxUnitCount, matchCount, totalStacks, affected, affectedUnits, unaffected, unaffectedUnits, role, mark)
       else
-        updated = UpdateStateWithNoMatch(time, triggerStates, triggerInfo, cloneId, unit, 0, 0, maxUnitCount, 0, 0, affected, unaffected, role, mark)
+        updated = UpdateStateWithNoMatch(time, triggerStates, triggerInfo, cloneId, unit, 0, 0, maxUnitCount, 0, 0, affected, affectedUnits, unaffected, unaffectedUnits, role, mark)
       end
     else
       updated = RemoveState(triggerStates, cloneId)
@@ -1980,9 +1992,9 @@ local function UpdateTriggerState(time, id, triggernum)
     if shouldUseMatches then
       table.sort(auraDatas, SortMatchDataByUnitIndex)
 
-      local affected, unaffected
+      local affected, affectedUnits, unaffected, unaffectedUnits
       if triggerInfo.useAffected then
-        affected, unaffected = FormatAffectedUnaffected(triggerInfo, matchedUnits)
+        affected, affectedUnits, unaffected, unaffectedUnits = FormatAffectedUnaffected(triggerInfo, matchedUnits)
       end
 
       local usedCloneIds = {};
@@ -2000,7 +2012,7 @@ local function UpdateTriggerState(time, id, triggernum)
         local role = roleForTriggerInfo(triggerInfo, auraData.unit)
         local mark = markForTriggerInfo(triggerInfo, auraData.unit)
         updated = UpdateStateWithMatch(time, auraData, triggerStates, cloneId, matchCount, unitCount, maxUnitCount,
-                                      matchCountPerUnit[auraData.unit], totalStacks, affected, unaffected, role, mark) or updated
+                                      matchCountPerUnit[auraData.unit], totalStacks, affected, affectedUnits, unaffected, unaffectedUnits, role, mark) or updated
         cloneIds[cloneId] = true
       end
       local expectedSpellMatches = (triggerInfo.auranames and #triggerInfo.auranames or 0) +
@@ -2010,17 +2022,9 @@ local function UpdateTriggerState(time, id, triggernum)
         local unit = bestUnit(triggerInfo, nil)
         local role = roleForTriggerInfo(triggerInfo, unit)
         local mark = markForTriggerInfo(triggerInfo, unit)
-
-        print("expectedSpellMatches: ", expectedSpellMatches, triggerInfo.id)
-
-        if expectedSpellMatches > 1  then
-          if DevTool then DevTool:AddData(WeakAuras.GetData(triggerInfo.id), "getData") end
-          -- dbg(WeakAuras.GetData(triggerInfo.id))
-          updated = UpdateStateWithMissingMatches(time, triggerStates, usedCloneIds, cloneIds, triggerInfo, unit, matchCount, unitCount, maxUnitCount, matchCountPerUnit[unit], totalStacks, affected, unaffected, role, mark) or updated
-        else
-          updated = UpdateStateWithNoMatch(time, triggerStates, triggerInfo, "", unit, 0, 0, maxUnitCount, 0, totalStacks, affected, unaffected, role, mark) or updated
-          cloneIds[""] = true
-        end
+        updated = UpdateStateWithNoMatch(time, triggerStates, triggerInfo, "", nil, 0, 0, maxUnitCount, 0, totalStacks,
+                                         affected, unaffected, role, mark) or updated
+        cloneIds[""] = true
       end
     end
 
@@ -2060,12 +2064,10 @@ local function UpdateTriggerState(time, id, triggernum)
     print("useMatches: ", shouldUseFoundMatches, triggerInfo.id)
 
     local cloneIds = {}
-    if shouldUseFoundMatches then
+    if useMatches then
       local affected, unaffected
-      -- when is this code ran?
-      -- is it a compatiblity hack?
       if triggerInfo.useAffected then
-        affected, unaffected = FormatAffectedUnaffected(triggerInfo, matchedUnits)
+        affected, affectedUnits, unaffected, unaffectedUnits = FormatAffectedUnaffected(triggerInfo, matchedUnits)
       end
 
       -- set states only for affected units
@@ -2075,7 +2077,7 @@ local function UpdateTriggerState(time, id, triggernum)
             local role = roleForTriggerInfo(triggerInfo, unit)
             local mark = markForTriggerInfo(triggerInfo, unit)
             updated = UpdateStateWithMatch(time, bestMatch, triggerStates, unit, matchCount, unitCount, maxUnitCount,
-                                           matchCountPerUnit[unit], totalStacks, affected, unaffected, role, mark)
+                                           matchCountPerUnit[unit], totalStacks, affected, affectedUnits, unaffected, unaffectedUnits, role, mark)
                                            or updated
             cloneIds[unit] = true
           end
@@ -2090,14 +2092,14 @@ local function UpdateTriggerState(time, id, triggernum)
             if bestMatch then
               if triggerInfo.perUnitMode == "all" then
                 updated = UpdateStateWithMatch(time, bestMatch, triggerStates, unit, matchCount, unitCount, maxUnitCount,
-                                               matchCountPerUnit[unit], totalStacks, affected, unaffected, role, mark)
+                                               matchCountPerUnit[unit], totalStacks, affected, affectedUnits, unaffected, unaffectedUnits, role, mark)
                                                or updated
                 cloneIds[unit] = true
               end
             else
               updated = UpdateStateWithNoMatch(time, triggerStates, triggerInfo, unit, unit, matchCount,
                                                unitCount, maxUnitCount, matchCountPerUnit[unit], totalStacks,
-                                              affected, unaffected, role)
+                                              affected, affectedUnits, unaffected, unaffectedUnits, role)
                                               or updated
               cloneIds[unit] = true
             end
@@ -2791,19 +2793,13 @@ Buff2Frame:RegisterEvent("UNIT_FLAGS")
 Buff2Frame:RegisterEvent("PLAYER_FLAGS_CHANGED")
 Buff2Frame:RegisterEvent("UNIT_PET")
 Buff2Frame:RegisterEvent("RAID_TARGET_UPDATE")
-if not WeakAuras.IsClassicEra() then
+Buff2Frame:RegisterEvent("PLAYER_SOFT_ENEMY_CHANGED")
+Buff2Frame:RegisterEvent("PLAYER_SOFT_FRIEND_CHANGED")
+if WeakAuras.IsWrathOrRetail() then
   Buff2Frame:RegisterEvent("PLAYER_FOCUS_CHANGED")
-  if WeakAuras.IsWrathOrRetail() then
-    Buff2Frame:RegisterEvent("PLAYER_SOFT_ENEMY_CHANGED")
-    Buff2Frame:RegisterEvent("PLAYER_SOFT_FRIEND_CHANGED")
-    Buff2Frame:RegisterEvent("ARENA_OPPONENT_UPDATE")
-  end
+  Buff2Frame:RegisterEvent("ARENA_OPPONENT_UPDATE")
   Buff2Frame:RegisterEvent("UNIT_ENTERED_VEHICLE")
   Buff2Frame:RegisterEvent("UNIT_EXITED_VEHICLE")
-else
-  LCD.RegisterCallback("WeakAuras", "UNIT_BUFF", function(event, unit)
-    EventHandler(Buff2Frame, "UNIT_AURA", unit)
-  end)
 end
 Buff2Frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 Buff2Frame:RegisterEvent("ENCOUNTER_START")
@@ -3597,7 +3593,7 @@ function BuffTrigger.Add(data)
       local effectiveIgnoreDisconnected = groupTrigger and trigger.ignoreDisconnected
       local effectiveIgnoreInvisible = groupTrigger and trigger.ignoreInvisible
       local effectiveNameCheck = groupTrigger and trigger.useUnitName and trigger.unitName
-      local effectiveNpcId = trigger.unit == "nameplate" and trigger.useNpcId and trigger.npcId
+      local effectiveNpcId = trigger.unit == "nameplate" and trigger.useNpcId and Private.ExecEnv.ParseStringCheck(trigger.npcId)
       local effectiveInRange = WeakAuras.IsRetail() and groupTrigger and trigger.inRange
 
       if trigger.unit == "multi" then
@@ -3890,6 +3886,8 @@ function BuffTrigger.GetAdditionalProperties(data, triggernum)
   if (trigger.unit == "group" or trigger.unit == "raid" or trigger.unit == "party") and trigger.useAffected then
     ret = ret .. "|cFFFF0000%".. triggernum .. ".affected|r - " .. L["Names of affected Players"] .. "\n"
     ret = ret .. "|cFFFF0000%".. triggernum .. ".unaffected|r - " .. L["Names of unaffected Players"] .. "\n"
+    ret = ret .. "|cFFFF0000%".. triggernum .. ".affectedUnits|r - " .. L["Units of affected Players in a table format"] .. "\n"
+    ret = ret .. "|cFFFF0000%".. triggernum .. ".unaffectedUnits|r - " .. L["Units of unaffected Players in a table format"] .. "\n"
   end
 
   return ret
@@ -3906,8 +3904,20 @@ function BuffTrigger.GetTriggerConditions(data, triggernum)
   }
 
   result["unitCaster"] = {
-    display = L["Caster"],
+    display = L["Caster Unit"],
     type = "string"
+  }
+
+  result["nameCaster"] = {
+    display = L["Casters Name/Realm"],
+    type = "string",
+    preamble = function(input)
+      return Private.ExecEnv.ParseNameCheck(input)
+    end,
+    test = function(state, needle, op, preamble)
+      return state.unitCaster and preamble:Check(WeakAuras.UnitNameWithRealm(state.unitCaster))
+    end,
+    operator_types = "none",
   }
 
   result["expirationTime"] = {
